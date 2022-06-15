@@ -32,12 +32,18 @@ import {
 export default class HeaderReader {
     constructor(arrayBuffer) {
         this._buf = arrayBuffer;
-        // 1024 is probably more than we need...
-        this._view = new DataView(this._buf, 0, 102400);
+        // We don't care about the length here since this doesn't really allocate any more
+        // memory.  We're also always starting from offset 0, so that doesn't matter, either.
+        this._view = new DataView(this._buf);
         this._offset = 0;
         this.headerVersion = null;
     }
 
+    /**
+     * Read the header version, or return it if it has already been read.
+     * This should be safe to call multiple times, and in any order with `read`
+     * @returns Number
+     */
     readHeaderVersion() {
         if (!this.headerVersion) {
             this.headerVersion = this.readInt();

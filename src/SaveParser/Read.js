@@ -17,9 +17,8 @@ export default class SaveParser_Read
         // Still used for header try not to shrink it too much as modMetadata can be longer than anticipated...
         this.bufferView         = new DataView(this.arrayBuffer, 0, 102400);
         this.currentByte        = 0;
-        this.handledByte        = 0;
         this.maxByte            = this.arrayBuffer.byteLength;
-        this.streamReader       = new StreamReader(() => this.inflateNextChunk());
+        this.streamReader       = null;
 
         this.parseSave();
     }
@@ -32,10 +31,13 @@ export default class SaveParser_Read
         if(saveHeaderType <= 99)
         {
             this.header = headerReader.read();
+            // keep track of this offset for chunk decompression purposes.
             this.currentByte = this.header.headerSize;
             console.log(this.header);
 
             this.worker.postMessage({command: 'transferData', data: {header: this.header}});
+
+            this.streamReader = new StreamReader(() => this.inflateNextChunk());
 
             // We should now unzip the body!
             if(this.header.saveVersion >= 21)
@@ -75,7 +77,6 @@ export default class SaveParser_Read
         // Read chunk info size...
         let chunkHeader     = new DataView(this.arrayBuffer, this.currentByte, 48);
         this.currentByte   += 48;
-        this.handledByte   += 48;
 
         if(this.PACKAGE_FILE_TAG === null)
         {
@@ -91,7 +92,6 @@ export default class SaveParser_Read
 
         let currentChunkSize    = chunkHeader.getUint32(16, true);
         let currentChunk        = this.arrayBuffer.slice(this.currentByte, this.currentByte + currentChunkSize);
-        this.handledByte       += currentChunkSize;
         this.currentByte       += currentChunkSize;
 
         // Unzip!
