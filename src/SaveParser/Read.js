@@ -743,14 +743,14 @@ export default class SaveParser_Read
                                 {
                                     this.streamReader.readByte(); // 0
                                     this.streamReader.readByte(); // 0
-                                    currentProperty.value.values.pushthis.streamReader.readByte();
+                                    currentProperty.value.values.push(this.streamReader.readByte());
                                     this.streamReader.readByte(); // 255
                                 }
                                 break;
                             default:
                                 for(let i = 0; i < currentArrayPropertyCount; i++)
                                 {
-                                    currentProperty.value.values.pushthis.streamReader.readByte();
+                                    currentProperty.value.values.push(this.streamReader.readByte());
                                 }
                         }
                         break;
