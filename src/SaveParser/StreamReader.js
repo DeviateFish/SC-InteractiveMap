@@ -10,7 +10,7 @@ import {
 
 /**
  * @callback ChunkReader
- * @returns {Promise<Uint8Array>}
+ * @returns {Uint8Array}
  */
 
 /**
@@ -47,18 +47,17 @@ export default class StreamReader {
         this._offset = 0;
         this._length = 0;
         this._view = null;
-        this.totalOffset = 0;
+        this.bytesRead = 0;
     }
 
     /**
      * Fetches a new chunk and extends the current buffer with the new data.
      * This can happen asynchronously.  This also resets the internal `_offset` number
      * to 0.
-     * @async
      * @returns Boolean
      */
-    async extend() {
-        const chunk = await this.getChunk();
+    extend() {
+        const chunk = this.getChunk();
         if (!chunk) {
             return false;
         }
@@ -94,17 +93,17 @@ export default class StreamReader {
      * as necessary.
      * @param {Number} bytes Number of bytes to read
      * @param {ValueGetter} getter Function to actually read the bytes from the buffer.
-     * @returns {Promise<*>}
+     * @returns {*}
      */
-    async _read(bytes, getter) {
+    _read(bytes, getter) {
         while (this._length - this._offset < bytes) {
-            if (!await this.extend()) {
+            if (!this.extend()) {
                 throw new Error(`StreamReader: Could not extend buffer to fetch ${bytes - this._length} additional bytes!`);
             }
         }
         const val = getter(this._view, this._offset);
         this._offset += bytes;
-        this.totalOffset += bytes;
+        this.bytesRead += bytes;
         return val;
     }
 
@@ -113,10 +112,11 @@ export default class StreamReader {
      * be avoided.
      * @param {Number} bytes Number of bytes to peek
      * @param {ValueGetter} getter Function to parse the bytes peeked
+     * @returns {*}
      */
-    async _peek(bytes, getter) {
+    _peek(bytes, getter) {
         while (this._length - this._offset < bytes) {
-            if (!await this.extend()) {
+            if (!this.extend()) {
                 throw new Error(`StreamReader: Could not extend buffer to fetch ${bytes - this._length} additional bytes!`);
             }
         }
@@ -128,7 +128,7 @@ export default class StreamReader {
      * Read an unsigned 8-bit number from the buffer
      * @returns Number
      */
-    async readByte() {
+    readByte() {
         return this._read(1, readUint8);
     }
 
@@ -136,7 +136,7 @@ export default class StreamReader {
      * Read a signed 8-bit number from the buffer
      * @returns Number
      */
-    async readInt8() {
+    readInt8() {
         return this._read(1, readInt8);
     }
 
@@ -144,7 +144,7 @@ export default class StreamReader {
      * Read a signed 32-bit number from the buffer
      * @returns Number
      */
-    async readInt() {
+    readInt() {
         return this._read(4, readInt32);
     }
 
@@ -154,9 +154,9 @@ export default class StreamReader {
      * consisting of [low, high]
      * @returns Number|Array<Number>
      */
-    async readLong() {
-        const low = await this.readInt();
-        const high = await this.readInt();
+    readLong() {
+        const low = this.readInt();
+        const high = this.readInt();
 
         if (high === 0) {
             return low;
@@ -169,7 +169,7 @@ export default class StreamReader {
      * Read a signed 32-bit float from the buffer
      * @returns Number
      */
-    async readFloat() {
+    readFloat() {
         return this._read(4, readFloat32);
     }
 
@@ -177,7 +177,7 @@ export default class StreamReader {
      * Read a signed 64-bit float from the buffer
      * @returns Number
      */
-    async readDouble() {
+    readDouble() {
         return this._read(8, readFloat64);
     }
 
@@ -190,8 +190,8 @@ export default class StreamReader {
      * The UTF-16 decoding seems a bit dodgy, though.
      * @returns String
      */
-    async readString() {
-        const length = await this.readInt();
+    readString() {
+        const length = this.readInt();
 
         if (length === 0) {
             return '';
@@ -212,12 +212,18 @@ export default class StreamReader {
      * @param {Number} length
      * @returns String
      */
-    async readRaw(length) {
+    readRaw(length) {
         return this._read(length, (buf, offset) => readUTF8String(buf, offset, length));
     }
 
-    async peekRaw(length) {
-
+    /**
+     * Attempts to read a fixed number of bytes as a utf-8 string WITHOUT advancing
+     * the current offset
+     * @param {Number} length Number of bytes to peek
+     * @returns
+     */
+    peekRaw(length) {
+        return this._peek(length, (buf, offset) => readUTF8String(buf, offset, length));
     }
 
     /**
@@ -225,7 +231,7 @@ export default class StreamReader {
      * @param {Number} [bytes=1] Number of bytes to skip (1 if not specified)
      * @returns void
      */
-    async skipBytes(bytes = 1) {
-        await this.readRaw(bytes);
+    skipBytes(bytes = 1) {
+        this.readRaw(bytes);
     }
 }

@@ -19,12 +19,12 @@ export default class SaveParser_Read
         this.currentByte        = 0;
         this.handledByte        = 0;
         this.maxByte            = this.arrayBuffer.byteLength;
-        this.streamReader       = new StreamReader(async () => this.inflateNextChunk());
+        this.streamReader       = new StreamReader(() => this.inflateNextChunk());
 
         this.parseSave();
     }
 
-    async parseSave()
+    parseSave()
     {
         const headerReader = new HeaderReader(this.arrayBuffer);
         const saveHeaderType = headerReader.readHeaderVersion();
@@ -45,7 +45,7 @@ export default class SaveParser_Read
                 this.maxChunkSize       = null;
 
                 // I don't know why we skip these bytes...
-                await this.streamReader.skipBytes(4);
+                this.streamReader.skipBytes(4);
 
                 if(this.header.saveVersion >= 29)
                 {
@@ -115,31 +115,31 @@ export default class SaveParser_Read
         }
     }
 
-    async parseByLevels() {
+    parseByLevels() {
         let collectables    = [];
-        let nbLevels        = await this.streamReader.readInt();
+        let nbLevels        = this.streamReader.readInt();
         let levels          = [];
 
         for(let j = 0; j <= nbLevels; j++)
         {
-            let levelName           = (j === nbLevels) ? 'Level Persistent_Level' : await this.streamReader.readString();
+            let levelName           = (j === nbLevels) ? 'Level Persistent_Level' : this.streamReader.readString();
                 levels.push(levelName);
-                await this.streamReader.readInt();//let objectsLength       = await this.streamReader.readInt();
-            let countObjects        = await this.streamReader.readInt();
+                this.streamReader.readInt();//let objectsLength       = this.streamReader.readInt();
+            let countObjects        = this.streamReader.readInt();
             let entitiesToObjects   = [];
 
             for(let i = 0; i < countObjects; i++)
             {
-                let objectType = await this.streamReader.readInt();
+                let objectType = this.streamReader.readInt();
                     switch(objectType)
                     {
                         case 0:
-                            let object                          = await this.readObject();
+                            let object                          = this.readObject();
                                 this.objects[object.pathName]   = object;
                                 entitiesToObjects[i]            = object.pathName;
                             break;
                         case 1:
-                            let actor                           = await this.readActor();
+                            let actor                           = this.readActor();
                                 this.objects[actor.pathName]    = actor;
                                 entitiesToObjects[i]            = actor.pathName;
 
@@ -161,26 +161,26 @@ export default class SaveParser_Read
                 }
             }
 
-            let countCollected = await this.streamReader.readInt();
+            let countCollected = this.streamReader.readInt();
                 if(countCollected > 0)
                 {
                     for(let i = 0; i < countCollected; i++)
                     {
-                        let collectable = await this.readObjectProperty({});
+                        let collectable = this.readObjectProperty({});
                             collectables.push(collectable);
                             //console.log(collectable, this.objects[collectable.pathName])
                     }
                 }
 
-                await this.streamReader.readInt();//let entitiesLength      = await this.streamReader.readInt();
-            let countEntities       = await this.streamReader.readInt();
+                this.streamReader.readInt();//let entitiesLength      = this.streamReader.readInt();
+            let countEntities       = this.streamReader.readInt();
             let objectsToFlush      = {};
 
             //console.log(levelName, countObjects, entitiesLength);
 
             for(let i = 0; i < countEntities; i++)
             {
-                await this.readEntity(entitiesToObjects[i]);
+                this.readEntity(entitiesToObjects[i]);
 
                 // Avoid memory error on very large save!
                 objectsToFlush[entitiesToObjects[i]] = this.objects[entitiesToObjects[i]];
@@ -201,12 +201,12 @@ export default class SaveParser_Read
             }
 
             // Twice but we need to handle them in order to fetch the next level...
-            countCollected = await this.streamReader.readInt();
+            countCollected = this.streamReader.readInt();
             if(countCollected > 0)
             {
                 for(let i = 0; i < countCollected; i++)
                 {
-                    await this.readObjectProperty({});
+                    this.readObjectProperty({});
                 }
             }
 
@@ -222,9 +222,9 @@ export default class SaveParser_Read
     /*
      * Progress bar from 30 to 45%
      */
-    async parseObjects()
+    parseObjects()
     {
-        let countObjects                = await this.streamReader.readInt();
+        let countObjects                = this.streamReader.readInt();
         let entitiesToObjects           = [];
             console.log('Parsing: ' + countObjects + ' objects...');
             this.worker.postMessage({command: 'loaderMessage', message: 'MAP\\SAVEPARSER\\Parsing %1$s objects (%2$s%)...', replace: [new Intl.NumberFormat(this.language).format(countObjects), 0]});
@@ -232,16 +232,16 @@ export default class SaveParser_Read
 
             for(let i = 0; i < countObjects; i++)
             {
-                let objectType = await this.streamReader.readInt();
+                let objectType = this.streamReader.readInt();
                     switch(objectType)
                     {
                         case 0:
-                            let object                          = await this.readObject();
+                            let object                          = this.readObject();
                                 this.objects[object.pathName]   = object;
                                 entitiesToObjects[i]            = object.pathName;
                             break;
                         case 1:
-                            let actor                           = await this.readActor();
+                            let actor                           = this.readActor();
                                 this.objects[actor.pathName]    = actor;
                                 entitiesToObjects[i]            = actor.pathName;
 
@@ -262,13 +262,13 @@ export default class SaveParser_Read
                 }
             }
 
-        return this.parseEntities(entitiesToObjects, 0, await this.streamReader.readInt());
+        return this.parseEntities(entitiesToObjects, 0, this.streamReader.readInt());
     }
 
     /*
      * Progress bar from 45 to 60%
      */
-    async parseEntities(entitiesToObjects, i, countEntities)
+    parseEntities(entitiesToObjects, i, countEntities)
     {
         console.log('Parsing: ' + countEntities + ' entities...');
         this.worker.postMessage({command: 'loaderMessage', message: 'MAP\\SAVEPARSER\\Parsing %1$s entities (%2$s%)...', replace: [new Intl.NumberFormat(this.language).format(countEntities), 0]});
@@ -278,7 +278,7 @@ export default class SaveParser_Read
 
         for(i; i < countEntities; i++)
         {
-            await this.readEntity(entitiesToObjects[i]);
+            this.readEntity(entitiesToObjects[i]);
 
             // Avoid memory error on very large save!
             objectsToFlush[entitiesToObjects[i]] = this.objects[entitiesToObjects[i]];
@@ -301,13 +301,13 @@ export default class SaveParser_Read
         return this.parseCollectables();
     }
 
-    async parseCollectables()
+    parseCollectables()
     {
         let collectables    = [];
-        let countCollected  = await this.streamReader.readInt();
+        let countCollected  = this.streamReader.readInt();
             for(let i = 0; i < countCollected; i++)
             {
-                collectables.push(await this.readObjectProperty({}));
+                collectables.push(this.readObjectProperty({}));
             }
 
         this.worker.postMessage({command: 'transferData', data: {collectables: collectables}});
@@ -319,23 +319,23 @@ export default class SaveParser_Read
     /*
      * Main objects
      */
-    async readObject()
+    readObject()
     {
         let object                  = {type : 0};
-            object.className        = await this.streamReader.readString();
-            object                  = await this.readObjectProperty(object);
-            object.outerPathName    = await this.streamReader.readString();
+            object.className        = this.streamReader.readString();
+            object                  = this.readObjectProperty(object);
+            object.outerPathName    = this.streamReader.readString();
 
         return object;
     }
 
-    async readActor()
+    readActor()
     {
         let actor               = {type : 1};
-            actor.className     = await this.streamReader.readString();
-            actor               = await this.readObjectProperty(actor);
+            actor.className     = this.streamReader.readString();
+            actor               = this.readObjectProperty(actor);
 
-        let needTransform       = await this.streamReader.readInt();
+        let needTransform       = this.streamReader.readInt();
             if(needTransform !== 0)
             {
                 actor.needTransform = needTransform;
@@ -343,8 +343,8 @@ export default class SaveParser_Read
 
             // {rotation: [0, 0, 0, 1], translation: [0, 0, 0], scale3d: [1, 1, 1]}
             actor.transform     = {
-                rotation            : [await this.streamReader.readFloat(), await this.streamReader.readFloat(), await this.streamReader.readFloat(), await this.streamReader.readFloat()],
-                translation         : [await this.streamReader.readFloat(), await this.streamReader.readFloat(), await this.streamReader.readFloat()]
+                rotation            : [this.streamReader.readFloat(), this.streamReader.readFloat(), this.streamReader.readFloat(), this.streamReader.readFloat()],
+                translation         : [this.streamReader.readFloat(), this.streamReader.readFloat(), this.streamReader.readFloat()]
             };
 
             // Enforce bounding on the map to avoid the game from skipping physics!
@@ -360,13 +360,13 @@ export default class SaveParser_Read
                 console.log('NaN translation', actor.pathName);
             }
 
-            let scale3d = [await this.streamReader.readFloat(), await this.streamReader.readFloat(), await this.streamReader.readFloat()];
+            let scale3d = [this.streamReader.readFloat(), this.streamReader.readFloat(), this.streamReader.readFloat()];
                 if(scale3d[0] !== 1 || scale3d[1] !== 1 || scale3d[2] !== 1)
                 {
                     actor.transform.scale3d = scale3d
                 }
 
-        let wasPlacedInLevel       = await this.streamReader.readInt();
+        let wasPlacedInLevel       = this.streamReader.readInt();
             if(wasPlacedInLevel !== 0) //TODO: Switch to 1?
             {
                 actor.wasPlacedInLevel = wasPlacedInLevel;
@@ -375,28 +375,28 @@ export default class SaveParser_Read
         return actor;
     }
 
-    async readEntity(objectKey)
+    readEntity(objectKey)
     {
-        let entityLength                            = await this.streamReader.readInt();
-        let startByte                               = this.streamReader.totalOffset;
+        let entityLength                            = this.streamReader.readInt();
+        let startByte                               = this.streamReader.bytesRead;
 
         if(this.objects[objectKey].type === 1)
         {
-            this.objects[objectKey].entity = await this.readObjectProperty({});
+            this.objects[objectKey].entity = this.readObjectProperty({});
 
-            let countChild  = await this.streamReader.readInt();
+            let countChild  = this.streamReader.readInt();
             if(countChild > 0)
             {
                 this.objects[objectKey].children = [];
 
                 for(let i = 0; i < countChild; i++)
                 {
-                    this.objects[objectKey].children.push(await this.readObjectProperty({}));
+                    this.objects[objectKey].children.push(this.readObjectProperty({}));
                 }
             }
         }
 
-        if((this.streamReader.totalOffset - startByte) === entityLength)
+        if((this.streamReader.bytesRead - startByte) === entityLength)
         {
             this.objects[objectKey].shouldBeNulled = true;
             return;
@@ -426,20 +426,20 @@ export default class SaveParser_Read
              || this.objects[objectKey].className.startsWith('/CoveredConveyor')
         )
         {
-            this.objects[objectKey].extra   = {count: await this.streamReader.readInt(), items: []};
-            let itemsLength                 = await this.streamReader.readInt();
+            this.objects[objectKey].extra   = {count: this.streamReader.readInt(), items: []};
+            let itemsLength                 = this.streamReader.readInt();
             for(let i = 0; i < itemsLength; i++)
             {
                 let currentItem             = {};
-                let currentItemLength       = await this.streamReader.readInt();
+                let currentItemLength       = this.streamReader.readInt();
                     if(currentItemLength !== 0)
                     {
                         currentItem.length  = currentItemLength;
                     }
-                    currentItem.name        = await this.streamReader.readString();
-                    await this.streamReader.readString(); //currentItem.levelName   = await this.streamReader.readString();
-                    await this.streamReader.readString(); //currentItem.pathName    = await this.streamReader.readString();
-                    currentItem.position    = await this.streamReader.readFloat();
+                    currentItem.name        = this.streamReader.readString();
+                    this.streamReader.readString(); //currentItem.levelName   = this.streamReader.readString();
+                    this.streamReader.readString(); //currentItem.pathName    = this.streamReader.readString();
+                    currentItem.position    = this.streamReader.readFloat();
 
                 this.objects[objectKey].extra.items.push(currentItem);
             }
@@ -451,12 +451,12 @@ export default class SaveParser_Read
             {
                 case '/Game/FactoryGame/-Shared/Blueprint/BP_GameState.BP_GameState_C':
                 case '/Game/FactoryGame/-Shared/Blueprint/BP_GameMode.BP_GameMode_C':
-                    this.objects[objectKey].extra   = {count: await this.streamReader.readInt(), game: []};
-                    let gameLength                  = await this.streamReader.readInt();
+                    this.objects[objectKey].extra   = {count: this.streamReader.readInt(), game: []};
+                    let gameLength                  = this.streamReader.readInt();
 
                     for(let i = 0; i < gameLength; i++)
                     {
-                        this.objects[objectKey].extra.game.push(await this.readObjectProperty({}));
+                        this.objects[objectKey].extra.game.push(this.readObjectProperty({}));
 
                         if(i === 0 && this.objects[objectKey].className === '/Game/FactoryGame/-Shared/Blueprint/BP_GameState.BP_GameState_C')
                         {
@@ -466,44 +466,44 @@ export default class SaveParser_Read
 
                     break;
                 case '/Game/FactoryGame/Character/Player/BP_PlayerState.BP_PlayerState_C':
-                    let missingPlayerState                  = (startByte + entityLength) - this.streamReader.totalOffset;
-                    this.objects[objectKey].missing         = await this.streamReader.peekRaw(missingPlayerState);
+                    let missingPlayerState                  = (startByte + entityLength) - this.streamReader.bytesRead;
+                    this.objects[objectKey].missing         = this.streamReader.peekRaw(missingPlayerState);
 
                     if(missingPlayerState > 0)
                     {
-                        await this.streamReader.readInt(); // Skip count
-                        let playerType = await this.streamReader.readByte();
+                        this.streamReader.readInt(); // Skip count
+                        let playerType = this.streamReader.readByte();
                             switch(playerType)
                             {
                                 case 248: // EOS
-                                    await this.streamReader.readString();
-                                    let eosStr                          = (await this.streamReader.readString()).split('|');
+                                    this.streamReader.readString();
+                                    let eosStr                          = this.streamReader.readString().split('|');
                                     this.objects[objectKey].eosId       = eosStr[0];
                                     break;
                                 case 249: // EOS
-                                    await this.streamReader.readString(); // EOS, then follow 17
+                                    this.streamReader.readString(); // EOS, then follow 17
                                 case 17: // Old EOS
-                                    let epicHexLength   = await this.streamReader.readByte();
+                                    let epicHexLength   = this.streamReader.readByte();
                                     let epicHex         = '';
                                     for(let i = 0; i < epicHexLength; i++)
                                     {
-                                        epicHex += (await this.streamReader.readByte()).toString(16).padStart(2, '0');
+                                        epicHex += this.streamReader.readByte().toString(16).padStart(2, '0');
                                     }
 
                                     this.objects[objectKey].eosId       = epicHex.replace(/^0+/, '');
                                     break;
                                 case 25: // Steam
-                                    let steamHexLength  = await this.streamReader.readByte();
+                                    let steamHexLength  = this.streamReader.readByte();
                                     let steamHex        = '';
                                     for(let i = 0; i < steamHexLength; i++)
                                     {
-                                        steamHex += (await this.streamReader.readByte()).toString(16).padStart(2, '0');
+                                        steamHex += this.streamReader.readByte().toString(16).padStart(2, '0');
                                     }
 
                                     this.objects[objectKey].steamId     = steamHex.replace(/^0+/, '');
                                     break;
                                 case 8: // ???
-                                    this.objects[objectKey].platformId  = await this.streamReader.readString();
+                                    this.objects[objectKey].platformId  = this.streamReader.readString();
                                     break;
                                 case 3: // Offline
                                     break;
@@ -524,20 +524,20 @@ export default class SaveParser_Read
                     break;
                 //TODO: Not 0 here so bypass those special cases, but why? We mainly do not want to get warned here...
                 case '/Game/FactoryGame/Buildable/Factory/DroneStation/BP_DroneTransport.BP_DroneTransport_C':
-                    let missingDrone                    = (startByte + entityLength) - this.streamReader.totalOffset;
-                    this.objects[objectKey].missing     = await this.streamReader.readRaw(missingDrone);
+                    let missingDrone                    = (startByte + entityLength) - this.streamReader.bytesRead;
+                    this.objects[objectKey].missing     = this.streamReader.readRaw(missingDrone);
 
                     break;
                 case '/Game/FactoryGame/-Shared/Blueprint/BP_CircuitSubsystem.BP_CircuitSubsystem_C':
-                    this.objects[objectKey].extra   = {count: await this.streamReader.readInt(), circuits: []};
-                    let circuitsLength              = await this.streamReader.readInt();
+                    this.objects[objectKey].extra   = {count: this.streamReader.readInt(), circuits: []};
+                    let circuitsLength              = this.streamReader.readInt();
 
                     for(let i = 0; i < circuitsLength; i++)
                     {
                         this.objects[objectKey].extra.circuits.push({
-                            circuitId   : await this.streamReader.readInt(),
-                            levelName   : await this.streamReader.readString(),
-                            pathName    : await this.streamReader.readString()
+                            circuitId   : this.streamReader.readInt(),
+                            levelName   : this.streamReader.readString(),
+                            pathName    : this.streamReader.readString()
                         });
                     }
 
@@ -551,26 +551,26 @@ export default class SaveParser_Read
                 case '/AB_CableMod/Visuals4/Build_AB-SPLight.Build_AB-SPLight_C':
                 case '/AB_CableMod/Visuals3/Build_AB-PLPaintable.Build_AB-PLPaintable_C':
                     this.objects[objectKey].extra       = {
-                        count   : await this.streamReader.readInt(),
-                        source  : await this.readObjectProperty({}),
-                        target  : await this.readObjectProperty({})
+                        count   : this.streamReader.readInt(),
+                        source  : this.readObjectProperty({}),
+                        target  : this.readObjectProperty({})
                     };
 
                     break;
                 case '/Game/FactoryGame/Buildable/Vehicle/Train/Locomotive/BP_Locomotive.BP_Locomotive_C':
                 case '/Game/FactoryGame/Buildable/Vehicle/Train/Wagon/BP_FreightWagon.BP_FreightWagon_C':
-                    this.objects[objectKey].extra   = {count: await this.streamReader.readInt(), objects: []};
-                    let trainLength                 = await this.streamReader.readInt();
+                    this.objects[objectKey].extra   = {count: this.streamReader.readInt(), objects: []};
+                    let trainLength                 = this.streamReader.readInt();
                     for(let i = 0; i < trainLength; i++)
                     {
                         this.objects[objectKey].extra.objects.push({
-                            name   : await this.streamReader.readString(),
-                            unk    : await this.streamReader.readRaw(53)
+                            name   : this.streamReader.readString(),
+                            unk    : this.streamReader.readRaw(53)
                         });
                     }
 
-                    this.objects[objectKey].extra.previous  = await this.readObjectProperty({});
-                    this.objects[objectKey].extra.next      = await this.readObjectProperty({});
+                    this.objects[objectKey].extra.previous  = this.readObjectProperty({});
+                    this.objects[objectKey].extra.next      = this.readObjectProperty({});
                     break;
                 case '/Game/FactoryGame/Buildable/Vehicle/Tractor/BP_Tractor.BP_Tractor_C':
                 case '/Game/FactoryGame/Buildable/Vehicle/Truck/BP_Truck.BP_Truck_C':
@@ -578,27 +578,27 @@ export default class SaveParser_Read
                 case '/Game/FactoryGame/Buildable/Vehicle/Cyberwagon/Testa_BP_WB.Testa_BP_WB_C':
                 case '/Game/FactoryGame/Buildable/Vehicle/Golfcart/BP_Golfcart.BP_Golfcart_C':
                 case '/Game/FactoryGame/Buildable/Vehicle/Golfcart/BP_GolfcartGold.BP_GolfcartGold_C':
-                    this.objects[objectKey].extra   = {count: await this.streamReader.readInt(), objects: []};
-                    let vehicleLength                   = await this.streamReader.readInt();
+                    this.objects[objectKey].extra   = {count: this.streamReader.readInt(), objects: []};
+                    let vehicleLength                   = this.streamReader.readInt();
                     for(let i = 0; i < vehicleLength; i++)
                     {
                         this.objects[objectKey].extra.objects.push({
-                            name   : await this.streamReader.readString(),
-                            unk    : await this.streamReader.readRaw(53)
+                            name   : this.streamReader.readString(),
+                            unk    : this.streamReader.readRaw(53)
                         });
                     }
 
                     break;
                 default:
-                    let missingBytes = (startByte + entityLength) - this.streamReader.totalOffset;
+                    let missingBytes = (startByte + entityLength) - this.streamReader.bytesRead;
                     if(missingBytes > 4)
                     {
-                        this.objects[objectKey].missing = await this.streamReader.readRaw(missingBytes); // TODO
+                        this.objects[objectKey].missing = this.streamReader.readRaw(missingBytes); // TODO
                         console.log('MISSING ' + missingBytes + '  BYTES', this.objects[objectKey]);
                     }
                     else
                     {
-                        await this.streamReader.skipBytes(4);
+                        this.streamReader.skipBytes(4);
                     }
 
                     break;
@@ -609,21 +609,21 @@ export default class SaveParser_Read
     /*
      * Properties types
      */
-    async readProperty(parentType = null)
+    readProperty(parentType = null)
     {
         let currentProperty         = {};
-            currentProperty.name    = await this.streamReader.readString();
+            currentProperty.name    = this.streamReader.readString();
 
         if(currentProperty.name === 'None')
         {
             return null;
         }
 
-        currentProperty.type    = await this.streamReader.readString();
+        currentProperty.type    = this.streamReader.readString();
 
-        await this.streamReader.skipBytes(4); // Length of the property, this is calculated when writing back ;)
+        this.streamReader.skipBytes(4); // Length of the property, this is calculated when writing back ;)
 
-        let index = await this.streamReader.readInt();
+        let index = this.streamReader.readInt();
             if(index !== 0)
             {
                 currentProperty.index = index;
@@ -632,106 +632,106 @@ export default class SaveParser_Read
         switch(currentProperty.type)
         {
             case 'BoolProperty':
-                currentProperty.value = await this.streamReader.readByte();
+                currentProperty.value = this.streamReader.readByte();
 
-                let unkBoolByte = await this.streamReader.readByte();
+                let unkBoolByte = this.streamReader.readByte();
                     if(unkBoolByte === 1)
                     {
-                        currentProperty.unkBool = await this.streamReader.readRaw(16);
+                        currentProperty.unkBool = this.streamReader.readRaw(16);
                     }
 
                 break;
 
             case 'Int8Property':
-                await this.streamReader.skipBytes();
-                currentProperty.value = await this.streamReader.readInt8();
+                this.streamReader.skipBytes();
+                currentProperty.value = this.streamReader.readInt8();
 
                 break;
 
             case 'IntProperty':
             case 'UInt32Property': // Mod?
-                let unkIntByte = await this.streamReader.readByte();
+                let unkIntByte = this.streamReader.readByte();
                     if(unkIntByte === 1)
                     {
-                        currentProperty.unkInt = await this.streamReader.readRaw(16);
+                        currentProperty.unkInt = this.streamReader.readRaw(16);
                     }
-                currentProperty.value = await this.streamReader.readInt();
+                currentProperty.value = this.streamReader.readInt();
 
                 break;
 
             case 'Int64Property':
             case 'UInt64Property':
-                await this.streamReader.skipBytes();
-                currentProperty.value = await this.streamReader.readLong();
+                this.streamReader.skipBytes();
+                currentProperty.value = this.streamReader.readLong();
 
                 break;
 
             case 'FloatProperty':
-                await this.streamReader.skipBytes();
-                currentProperty.value = await this.streamReader.readFloat();
+                this.streamReader.skipBytes();
+                currentProperty.value = this.streamReader.readFloat();
 
                 break;
 
             case 'DoubleProperty':
-                await this.streamReader.skipBytes();
-                currentProperty.value = await this.streamReader.readDouble();
+                this.streamReader.skipBytes();
+                currentProperty.value = this.streamReader.readDouble();
 
                 break;
 
             case 'StrProperty':
             case 'NameProperty':
-                await this.streamReader.skipBytes();
-                currentProperty.value = await this.streamReader.readString();
+                this.streamReader.skipBytes();
+                currentProperty.value = this.streamReader.readString();
 
                 break;
 
             case 'ObjectProperty':
             case 'InterfaceProperty':
-                await this.streamReader.skipBytes();
-                currentProperty.value = await this.readObjectProperty({});
+                this.streamReader.skipBytes();
+                currentProperty.value = this.readObjectProperty({});
                 break;
 
             case 'EnumProperty':
-                let enumPropertyName = await this.streamReader.readString();
-                await this.streamReader.skipBytes();
+                let enumPropertyName = this.streamReader.readString();
+                this.streamReader.skipBytes();
                 currentProperty.value = {
                     name: enumPropertyName,
-                    value: await this.streamReader.readString()
+                    value: this.streamReader.readString()
                 };
 
                 break;
 
             case 'ByteProperty':
-                let enumName = await this.streamReader.readString(); //TODO
-                await this.streamReader.skipBytes();
+                let enumName = this.streamReader.readString(); //TODO
+                this.streamReader.skipBytes();
 
                 if(enumName === 'None')
                 {
                     currentProperty.value = {
                         enumName: enumName,
-                        value: await this.streamReader.readByte()
+                        value: this.streamReader.readByte()
                     };
                 }
                 else
                 {
                     currentProperty.value = {
                         enumName: enumName,
-                        valueName: await this.streamReader.readString()
+                        valueName: this.streamReader.readString()
                     };
                 }
 
                 break;
 
             case 'TextProperty':
-                await this.streamReader.skipBytes();
-                currentProperty             = await this.readTextProperty(currentProperty);
+                this.streamReader.skipBytes();
+                currentProperty             = this.readTextProperty(currentProperty);
 
                 break;
 
             case 'ArrayProperty':
-                    currentProperty.value       = {type    : await this.streamReader.readString(), values  : []};
-                    await this.streamReader.skipBytes();
-                let currentArrayPropertyCount   = await this.streamReader.readInt();
+                    currentProperty.value       = {type    : this.streamReader.readString(), values  : []};
+                    this.streamReader.skipBytes();
+                let currentArrayPropertyCount   = this.streamReader.readInt();
 
                 switch(currentProperty.value.type)
                 {
@@ -741,16 +741,16 @@ export default class SaveParser_Read
                             case 'mFogOfWarRawData':
                                 for(let i = 0; i < (currentArrayPropertyCount / 4); i++)
                                 {
-                                    await this.streamReader.readByte(); // 0
-                                    await this.streamReader.readByte(); // 0
-                                    currentProperty.value.values.push(await this.streamReader.readByte());
-                                    await this.streamReader.readByte(); // 255
+                                    this.streamReader.readByte(); // 0
+                                    this.streamReader.readByte(); // 0
+                                    currentProperty.value.values.pushthis.streamReader.readByte();
+                                    this.streamReader.readByte(); // 255
                                 }
                                 break;
                             default:
                                 for(let i = 0; i < currentArrayPropertyCount; i++)
                                 {
-                                    currentProperty.value.values.push(await this.streamReader.readByte());
+                                    currentProperty.value.values.pushthis.streamReader.readByte();
                                 }
                         }
                         break;
@@ -758,39 +758,39 @@ export default class SaveParser_Read
                     case 'BoolProperty':
                         for(let i = 0; i < currentArrayPropertyCount; i++)
                         {
-                            currentProperty.value.values.push(await this.streamReader.readByte());
+                            currentProperty.value.values.push(this.streamReader.readByte());
                         }
 
                     case 'IntProperty':
                         for(let i = 0; i < currentArrayPropertyCount; i++)
                         {
-                            currentProperty.value.values.push(await this.streamReader.readInt());
+                            currentProperty.value.values.push(this.streamReader.readInt());
                         }
                         break;
 
                     case 'FloatProperty':
                         for(let i = 0; i < currentArrayPropertyCount; i++)
                         {
-                            currentProperty.value.values.push(await this.streamReader.readFloat());
+                            currentProperty.value.values.push(this.streamReader.readFloat());
                         }
                         break;
 
                     case 'EnumProperty':
                         for(let i = 0; i < currentArrayPropertyCount; i++)
                         {
-                            currentProperty.value.values.push({name: await this.streamReader.readString()});
+                            currentProperty.value.values.push({name: this.streamReader.readString()});
                         }
                         break;
                     case 'StrProperty':
                         for(let i = 0; i < currentArrayPropertyCount; i++)
                         {
-                            currentProperty.value.values.push(await this.streamReader.readString());
+                            currentProperty.value.values.push(this.streamReader.readString());
                         }
                         break;
                     case 'TextProperty': // ???
                         for(let i = 0; i < currentArrayPropertyCount; i++)
                         {
-                            currentProperty.value.values.push(await this.readTextProperty({}));
+                            currentProperty.value.values.push(this.readTextProperty({}));
                         }
                         break;
 
@@ -798,23 +798,23 @@ export default class SaveParser_Read
                     case 'InterfaceProperty':
                         for(let i = 0; i < currentArrayPropertyCount; i++)
                         {
-                            currentProperty.value.values.push(await this.readObjectProperty({}));
+                            currentProperty.value.values.push(this.readObjectProperty({}));
                         }
                         break;
 
                     case 'StructProperty':
-                        currentProperty.structureName       = await this.streamReader.readString();
-                        currentProperty.structureType       = await this.streamReader.readString();
+                        currentProperty.structureName       = this.streamReader.readString();
+                        currentProperty.structureType       = this.streamReader.readString();
 
-                        await this.streamReader.readInt(); // structureSize
-                        await this.streamReader.readInt(); // 0
+                        this.streamReader.readInt(); // structureSize
+                        this.streamReader.readInt(); // 0
 
-                        currentProperty.structureSubType    = await this.streamReader.readString();
+                        currentProperty.structureSubType    = this.streamReader.readString();
 
-                        let propertyGuid1 = await this.streamReader.readInt();
-                        let propertyGuid2 = await this.streamReader.readInt();
-                        let propertyGuid3 = await this.streamReader.readInt();
-                        let propertyGuid4 = await this.streamReader.readInt();
+                        let propertyGuid1 = this.streamReader.readInt();
+                        let propertyGuid2 = this.streamReader.readInt();
+                        let propertyGuid3 = this.streamReader.readInt();
+                        let propertyGuid4 = this.streamReader.readInt();
                             if(propertyGuid1 !== 0)
                             {
                                 currentProperty.propertyGuid1 = propertyGuid1;
@@ -832,7 +832,7 @@ export default class SaveParser_Read
                                 currentProperty.propertyGuid4 = propertyGuid4;
                             }
 
-                        await this.streamReader.skipBytes(1);
+                        this.streamReader.skipBytes(1);
 
                         for(let i = 0; i < currentArrayPropertyCount; i++)
                         {
@@ -840,42 +840,42 @@ export default class SaveParser_Read
                             {
                                 case 'InventoryItem': // MOD: FicsItNetworks
                                     currentProperty.value.values.push({
-                                        unk1          : await this.streamReader.readInt(),
-                                        itemName      : await this.streamReader.readString(),
-                                        levelName     : await this.streamReader.readString(),
-                                        pathName      : await this.streamReader.readString()
+                                        unk1          : this.streamReader.readInt(),
+                                        itemName      : this.streamReader.readString(),
+                                        levelName     : this.streamReader.readString(),
+                                        pathName      : this.streamReader.readString()
                                     });
                                     break;
 
                                 case 'Guid':
-                                    currentProperty.value.values.push(await this.streamReader.readRaw(16));
+                                    currentProperty.value.values.push(this.streamReader.readRaw(16));
                                     break;
 
                                 case 'FINNetworkTrace': // MOD: FicsIt-Networks
-                                    currentProperty.value.values.push(await this.readFINNetworkTrace());
+                                    currentProperty.value.values.push(this.readFINNetworkTrace());
                                     break;
 
                                 case 'Vector':
                                     currentProperty.value.values.push({
-                                        x           : await this.streamReader.readFloat(),
-                                        y           : await this.streamReader.readFloat(),
-                                        z           : await this.streamReader.readFloat()
+                                        x           : this.streamReader.readFloat(),
+                                        y           : this.streamReader.readFloat(),
+                                        z           : this.streamReader.readFloat()
                                     });
                                     break;
 
                                 case 'LinearColor':
                                     currentProperty.value.values.push({
-                                        r : await this.streamReader.readFloat(),
-                                        g : await this.streamReader.readFloat(),
-                                        b : await this.streamReader.readFloat(),
-                                        a : await this.streamReader.readFloat()
+                                        r : this.streamReader.readFloat(),
+                                        g : this.streamReader.readFloat(),
+                                        b : this.streamReader.readFloat(),
+                                        a : this.streamReader.readFloat()
                                     });
                                     break;
 
                                 // MOD: FicsIt-Networks
                                 // See: https://github.com/CoderDE/FicsIt-Networks/blob/3472a437bcd684deb7096ede8f03a7e338b4a43d/Source/FicsItNetworks/Computer/FINComputerGPUT1.h#L42
                                 case 'FINGPUT1BufferPixel':
-                                    currentProperty.value.values.push(await this.readFINGPUT1BufferPixel());
+                                    currentProperty.value.values.push(this.readFINGPUT1BufferPixel());
                                     break;
 
                                 default: // Try normalised structure, then throw Error if not working...
@@ -884,7 +884,7 @@ export default class SaveParser_Read
                                         let subStructProperties = [];
                                             while(true)
                                             {
-                                                let subStructProperty = await this.readProperty();
+                                                let subStructProperty = this.readProperty();
 
                                                     if(subStructProperty === null)
                                                     {
@@ -922,27 +922,27 @@ export default class SaveParser_Read
 
             case 'MapProperty':
                 currentProperty.value = {
-                    keyType         : await this.streamReader.readString(),
-                    valueType       : await this.streamReader.readString(),
+                    keyType         : this.streamReader.readString(),
+                    valueType       : this.streamReader.readString(),
                     values          : []
                 };
 
-                    await this.streamReader.skipBytes(1);
-                    currentProperty.value.modeType = await this.streamReader.readInt();
+                    this.streamReader.skipBytes(1);
+                    currentProperty.value.modeType = this.streamReader.readInt();
 
                     if(currentProperty.value.modeType === 2)
                     {
-                        currentProperty.value.modeUnk2 = await this.streamReader.readString();
-                        currentProperty.value.modeUnk3 = await this.streamReader.readString();
+                        currentProperty.value.modeUnk2 = this.streamReader.readString();
+                        currentProperty.value.modeUnk3 = this.streamReader.readString();
                     }
                     if(currentProperty.value.modeType === 3)
                     {
-                        currentProperty.value.modeUnk1 = await this.streamReader.readRaw(9);
-                        currentProperty.value.modeUnk2 = await this.streamReader.readString();
-                        currentProperty.value.modeUnk3 = await this.streamReader.readString();
+                        currentProperty.value.modeUnk1 = this.streamReader.readRaw(9);
+                        currentProperty.value.modeUnk2 = this.streamReader.readString();
+                        currentProperty.value.modeUnk3 = this.streamReader.readString();
                     }
 
-                let currentMapPropertyCount = await this.streamReader.readInt();
+                let currentMapPropertyCount = this.streamReader.readInt();
                     for(let iMapProperty = 0; iMapProperty < currentMapPropertyCount; iMapProperty++)
                     {
                         let mapPropertyKey;
@@ -951,28 +951,28 @@ export default class SaveParser_Read
                             switch(currentProperty.value.keyType)
                             {
                                 case 'IntProperty':
-                                    mapPropertyKey = await this.streamReader.readInt();
+                                    mapPropertyKey = this.streamReader.readInt();
                                     break;
                                 case 'Int64Property':
-                                    mapPropertyKey = await this.streamReader.readLong();
+                                    mapPropertyKey = this.streamReader.readLong();
                                     break;
                                 case 'NameProperty':
                                 case 'StrProperty':
-                                    mapPropertyKey = await this.streamReader.readString();
+                                    mapPropertyKey = this.streamReader.readString();
                                     break;
                                 case 'ObjectProperty':
-                                    mapPropertyKey = await this.readObjectProperty({});
+                                    mapPropertyKey = this.readObjectProperty({});
                                     break;
                                 case 'EnumProperty':
                                     mapPropertyKey = {
-                                        name        : await this.streamReader.readString()
+                                        name        : this.streamReader.readString()
                                     };
                                     break;
                                 case 'StructProperty':
                                     mapPropertyKey = [];
                                     while(true)
                                     {
-                                        let subMapPropertyValue = await this.readProperty();
+                                        let subMapPropertyValue = this.readProperty();
                                             if(subMapPropertyValue === null)
                                             {
                                                 break;
@@ -995,37 +995,37 @@ export default class SaveParser_Read
                                 case 'ByteProperty':
                                     if(currentProperty.value.keyType === 'StrProperty')
                                     {
-                                        mapPropertySubProperties = await this.streamReader.readString();
+                                        mapPropertySubProperties = this.streamReader.readString();
                                     }
                                     else
                                     {
-                                        mapPropertySubProperties = await this.streamReader.readByte();
+                                        mapPropertySubProperties = this.streamReader.readByte();
                                     }
                                     break;
                                 case 'BoolProperty':
-                                    mapPropertySubProperties = await this.streamReader.readByte();
+                                    mapPropertySubProperties = this.streamReader.readByte();
                                     break;
                                 case 'IntProperty':
-                                    mapPropertySubProperties = await this.streamReader.readInt();
+                                    mapPropertySubProperties = this.streamReader.readInt();
                                     break;
                                 case 'StrProperty':
-                                    mapPropertySubProperties = await this.streamReader.readString();
+                                    mapPropertySubProperties = this.streamReader.readString();
                                     break;
                                 case 'ObjectProperty':
-                                    mapPropertySubProperties = await this.readObjectProperty({});
+                                    mapPropertySubProperties = this.readObjectProperty({});
                                     break;
                                 case 'StructProperty':
                                     if(parentType === 'LBBalancerData')
                                     {
-                                        mapPropertySubProperties.mNormalIndex   = await this.streamReader.readInt();
-                                        mapPropertySubProperties.mOverflowIndex = await this.streamReader.readInt();
-                                        mapPropertySubProperties.mFilterIndex   = await this.streamReader.readInt();
+                                        mapPropertySubProperties.mNormalIndex   = this.streamReader.readInt();
+                                        mapPropertySubProperties.mOverflowIndex = this.streamReader.readInt();
+                                        mapPropertySubProperties.mFilterIndex   = this.streamReader.readInt();
                                     }
                                     else
                                     {
                                         while(true)
                                         {
-                                            let subMapProperty = await this.readProperty();
+                                            let subMapProperty = this.readProperty();
                                                 if(subMapProperty === null)
                                                 {
                                                     break;
@@ -1052,44 +1052,44 @@ export default class SaveParser_Read
                 break;
 
             case 'StructProperty':
-                currentProperty.value = {type: await this.streamReader.readString()};
-                await this.streamReader.skipBytes(17); // 0 0 0 0 + skipByte(1)
+                currentProperty.value = {type: this.streamReader.readString()};
+                this.streamReader.skipBytes(17); // 0 0 0 0 + skipByte(1)
 
                 switch(currentProperty.value.type)
                 {
                     case 'Color':
                         currentProperty.value.values = {
-                            b           : await this.streamReader.readByte(),
-                            g           : await this.streamReader.readByte(),
-                            r           : await this.streamReader.readByte(),
-                            a           : await this.streamReader.readByte()
+                            b           : this.streamReader.readByte(),
+                            g           : this.streamReader.readByte(),
+                            r           : this.streamReader.readByte(),
+                            a           : this.streamReader.readByte()
                         };
 
                         break;
 
                     case 'LinearColor':
                         currentProperty.value.values ={
-                            r           : await this.streamReader.readFloat(),
-                            g           : await this.streamReader.readFloat(),
-                            b           : await this.streamReader.readFloat(),
-                            a           : await this.streamReader.readFloat()
+                            r           : this.streamReader.readFloat(),
+                            g           : this.streamReader.readFloat(),
+                            b           : this.streamReader.readFloat(),
+                            a           : this.streamReader.readFloat()
                         };
                         break;
 
                     case 'Vector':
                     case 'Rotator':
                         currentProperty.value.values = {
-                            x           : await this.streamReader.readFloat(),
-                            y           : await this.streamReader.readFloat(),
-                            z           : await this.streamReader.readFloat()
+                            x           : this.streamReader.readFloat(),
+                            y           : this.streamReader.readFloat(),
+                            z           : this.streamReader.readFloat()
                         };
 
                         break;
 
                     case 'Vector2D': // Mod?
                         currentProperty.value.values = {
-                            x           : await this.streamReader.readFloat(),
-                            y           : await this.streamReader.readFloat()
+                            x           : this.streamReader.readFloat(),
+                            y           : this.streamReader.readFloat()
                         };
 
                         break;
@@ -1097,74 +1097,74 @@ export default class SaveParser_Read
                     case 'Quat':
                     case 'Vector4':
                         currentProperty.value.values = {
-                            a           : await this.streamReader.readFloat(),
-                            b           : await this.streamReader.readFloat(),
-                            c           : await this.streamReader.readFloat(),
-                            d           : await this.streamReader.readFloat()
+                            a           : this.streamReader.readFloat(),
+                            b           : this.streamReader.readFloat(),
+                            c           : this.streamReader.readFloat(),
+                            d           : this.streamReader.readFloat()
                         };
 
                         break;
 
                     case 'Box':
                         currentProperty.value.min = {
-                            x           : await this.streamReader.readFloat(),
-                            y           : await this.streamReader.readFloat(),
-                            z           : await this.streamReader.readFloat()
+                            x           : this.streamReader.readFloat(),
+                            y           : this.streamReader.readFloat(),
+                            z           : this.streamReader.readFloat()
                         };
                         currentProperty.value.max = {
-                            x           : await this.streamReader.readFloat(),
-                            y           : await this.streamReader.readFloat(),
-                            z           : await this.streamReader.readFloat()
+                            x           : this.streamReader.readFloat(),
+                            y           : this.streamReader.readFloat(),
+                            z           : this.streamReader.readFloat()
                         };
-                        currentProperty.value.isValid = await this.streamReader.readByte();
+                        currentProperty.value.isValid = this.streamReader.readByte();
 
                         break;
 
                     case 'RailroadTrackPosition':
-                        currentProperty.value               = await this.readObjectProperty(currentProperty.value);
-                        currentProperty.value.offset        = await this.streamReader.readFloat();
-                        currentProperty.value.forward       = await this.streamReader.readFloat();
+                        currentProperty.value               = this.readObjectProperty(currentProperty.value);
+                        currentProperty.value.offset        = this.streamReader.readFloat();
+                        currentProperty.value.forward       = this.streamReader.readFloat();
 
                         break;
 
                     case 'TimerHandle':
-                        currentProperty.value.handle        = await this.streamReader.readString();
+                        currentProperty.value.handle        = this.streamReader.readString();
 
                         break;
 
                     case 'Guid': // MOD?
-                        currentProperty.value.guid          = await this.streamReader.readRaw(16);
+                        currentProperty.value.guid          = this.streamReader.readRaw(16);
                         break;
 
                     case 'InventoryItem':
-                        currentProperty.value.unk1          = await this.streamReader.readInt();
-                        currentProperty.value.itemName      = await this.streamReader.readString();
-                        currentProperty.value               = await this.readObjectProperty(currentProperty.value);
+                        currentProperty.value.unk1          = this.streamReader.readInt();
+                        currentProperty.value.itemName      = this.streamReader.readString();
+                        currentProperty.value               = this.readObjectProperty(currentProperty.value);
                         currentProperty.value.properties    = [];
-                        currentProperty.value.properties.push(await this.readProperty());
+                        currentProperty.value.properties.push(this.readProperty());
                         break;
 
                     case 'FluidBox':
-                        currentProperty.value.value         = await this.streamReader.readFloat();
+                        currentProperty.value.value         = this.streamReader.readFloat();
                         break;
 
                     case 'SlateBrush': // MOD?
-                        currentProperty.value.unk1          = await this.streamReader.readString();
+                        currentProperty.value.unk1          = this.streamReader.readString();
                         break;
 
                     case 'DateTime': // MOD: Power Suit
-                        currentProperty.value.dateTime      = await this.streamReader.readLong();
+                        currentProperty.value.dateTime      = this.streamReader.readLong();
                         break;
 
                     case 'FINNetworkTrace': // MOD: FicsIt-Networks
-                        currentProperty.value.values        = await this.readFINNetworkTrace();
+                        currentProperty.value.values        = this.readFINNetworkTrace();
                         break;
                     case 'FINLuaProcessorStateStorage': // MOD: FicsIt-Networks
-                        currentProperty.value.values        = await this.readFINLuaProcessorStateStorage();
+                        currentProperty.value.values        = this.readFINLuaProcessorStateStorage();
                         break;
                     case 'FICFrameRange': // https://github.com/Panakotta00/FicsIt-Cam/blob/c55e254a84722c56e1badabcfaef1159cd7d2ef1/Source/FicsItCam/Public/Data/FICTypes.h#L34
-                        currentProperty.value.begin         = await this.streamReader.readLong();
-                        currentProperty.value.end           = await this.streamReader.readLong();
+                        currentProperty.value.begin         = this.streamReader.readLong();
+                        currentProperty.value.end           = this.streamReader.readLong();
                         break;
 
                     default: // Try normalised structure, then throw Error if not working...
@@ -1173,7 +1173,7 @@ export default class SaveParser_Read
                             currentProperty.value.values = [];
                             while(true)
                             {
-                                let subStructProperty = await this.readProperty(currentProperty.value.type);
+                                let subStructProperty = this.readProperty(currentProperty.value.type);
                                     if(subStructProperty === null)
                                     {
                                         break;
@@ -1201,35 +1201,35 @@ export default class SaveParser_Read
                 break;
 
             case 'SetProperty':
-                currentProperty.value = {type: await this.streamReader.readString(), values: []};
-                await this.streamReader.skipBytes(5); // skipByte(1) + 0
+                currentProperty.value = {type: this.streamReader.readString(), values: []};
+                this.streamReader.skipBytes(5); // skipByte(1) + 0
 
-                let setPropertyLength = await this.streamReader.readInt();
+                let setPropertyLength = this.streamReader.readInt();
                 for(let iSetProperty = 0; iSetProperty < setPropertyLength; iSetProperty++)
                 {
                     switch(currentProperty.value.type)
                     {
                         case 'ObjectProperty':
-                            currentProperty.value.values.push(await this.readObjectProperty({}));
+                            currentProperty.value.values.push(this.readObjectProperty({}));
                             break;
                         case 'StructProperty':
                             if(this.header.saveVersion >= 29 && parentType === '/Script/FactoryGame.FGFoliageRemoval')
                             {
                                 currentProperty.value.values.push({
-                                    x: await this.streamReader.readFloat(),
-                                    y: await this.streamReader.readFloat(),
-                                    z: await this.streamReader.readFloat()
+                                    x: this.streamReader.readFloat(),
+                                    y: this.streamReader.readFloat(),
+                                    z: this.streamReader.readFloat()
                                 });
                                 break;
                             }
                             // MOD: FicsIt-Networks
-                            currentProperty.value.values.push(await this.readFINNetworkTrace());
+                            currentProperty.value.values.push(this.readFINNetworkTrace());
                             break;
                         case 'NameProperty':  // MOD: Sweet Transportal
-                            currentProperty.value.values.push({name: await this.streamReader.readString()});
+                            currentProperty.value.values.push({name: this.streamReader.readString()});
                             break;
                         case 'IntProperty':  // MOD: ???
-                            currentProperty.value.values.push({int: await this.streamReader.readInt()});
+                            currentProperty.value.values.push({int: this.streamReader.readInt()});
                             break;
                         default:
                            this.worker.postMessage({command: 'alertParsing'});
@@ -1237,7 +1237,7 @@ export default class SaveParser_Read
                             {
                                 Sentry.setContext('currentProperty', currentProperty);
                             }
-                            throw new Error('Unimplemented type `' + currentProperty.value.type + '` in SetProperty `' + currentProperty.name + '` (' + this.streamReader.totalOffset + ')');
+                            throw new Error('Unimplemented type `' + currentProperty.value.type + '` in SetProperty `' + currentProperty.name + '` (' + this.streamReader.bytesRead + ')');
                     }
                 }
 
@@ -1249,7 +1249,7 @@ export default class SaveParser_Read
                 {
                     Sentry.setContext('currentProperty', currentProperty);
                 }
-                throw new Error('Unimplemented type `' + currentProperty.type + '` in Property `' + currentProperty.name + '` (' + this.streamReader.totalOffset + ')');
+                throw new Error('Unimplemented type `' + currentProperty.type + '` in Property `' + currentProperty.name + '` (' + this.streamReader.bytesRead + ')');
         }
 
         return currentProperty;
@@ -1279,38 +1279,38 @@ export default class SaveParser_Read
     const FORMATARGUMENTTYPE_TEXT = 4;
     const FORMATARGUMENTTYPE_GENDER = 5;
     */
-    async readTextProperty(currentProperty)
+    readTextProperty(currentProperty)
     {
-        currentProperty.flags       = await this.streamReader.readInt();
-        currentProperty.historyType = await this.streamReader.readByte();
+        currentProperty.flags       = this.streamReader.readInt();
+        currentProperty.historyType = this.streamReader.readByte();
 
         switch(currentProperty.historyType)
         {
             // HISTORYTYPE_BASE
             case 0:
-                currentProperty.namespace       = await this.streamReader.readString();
-                currentProperty.key             = await this.streamReader.readString();
-                currentProperty.value           = await this.streamReader.readString();
+                currentProperty.namespace       = this.streamReader.readString();
+                currentProperty.key             = this.streamReader.readString();
+                currentProperty.value           = this.streamReader.readString();
                 break;
             // HISTORYTYPE_NAMEDFORMAT
             case 1:
             // HISTORYTYPE_ARGUMENTFORMAT
             case 3:
-                currentProperty.sourceFmt       = await this.readTextProperty({});
+                currentProperty.sourceFmt       = this.readTextProperty({});
 
-                currentProperty.argumentsCount  = await this.streamReader.readInt();
+                currentProperty.argumentsCount  = this.streamReader.readInt();
                 currentProperty.arguments       = [];
 
                 for(let i = 0; i < currentProperty.argumentsCount; i++)
                 {
                     let currentArgumentsData                = {};
-                        currentArgumentsData.name           = await this.streamReader.readString();
-                        currentArgumentsData.valueType      = await this.streamReader.readByte();
+                        currentArgumentsData.name           = this.streamReader.readString();
+                        currentArgumentsData.valueType      = this.streamReader.readByte();
 
                         switch(currentArgumentsData.valueType)
                         {
                             case 4:
-                                currentArgumentsData.argumentValue    = await this.readTextProperty({});
+                                currentArgumentsData.argumentValue    = this.readTextProperty({});
                                 break;
                             default:
                                 this.worker.postMessage({command: 'alertParsing'});
@@ -1328,19 +1328,19 @@ export default class SaveParser_Read
             // See: https://github.com/EpicGames/UnrealEngine/blob/4.25/Engine/Source/Runtime/Core/Private/Internationalization/TextHistory.cpp#L2268
             // HISTORYTYPE_TRANSFORM
             case 10:
-                currentProperty.sourceText          = await this.readTextProperty({});
-                currentProperty.transformType       = await this.streamReader.readByte();
+                currentProperty.sourceText          = this.readTextProperty({});
+                currentProperty.transformType       = this.streamReader.readByte();
                 break;
             // HISTORYTYPE_NONE
             case 255:
                 // See: https://github.com/EpicGames/UnrealEngine/blob/4.25/Engine/Source/Runtime/Core/Private/Internationalization/Text.cpp#L894
                 if(this.header.buildVersion >= 140822)
                 {
-                    currentProperty.hasCultureInvariantString   = await this.streamReader.readInt();
+                    currentProperty.hasCultureInvariantString   = this.streamReader.readInt();
 
                     if(currentProperty.hasCultureInvariantString === 1)
                     {
-                        currentProperty.value = await this.streamReader.readString();
+                        currentProperty.value = this.streamReader.readString();
                     }
                 }
                 break;
@@ -1356,14 +1356,14 @@ export default class SaveParser_Read
         return currentProperty;
     }
 
-    async readObjectProperty(currentProperty)
+    readObjectProperty(currentProperty)
     {
-        let levelName   = await this.streamReader.readString();
+        let levelName   = this.streamReader.readString();
             if(levelName !== 'Persistent_Level')
             {
                 currentProperty.levelName = levelName;
             }
-        currentProperty.pathName  = await this.streamReader.readString();
+        currentProperty.pathName  = this.streamReader.readString();
 
         return currentProperty;
     }
@@ -1371,122 +1371,122 @@ export default class SaveParser_Read
     /*
      * FicsIt-Networks properties
      */
-    async readFINGPUT1BufferPixel()
+    readFINGPUT1BufferPixel()
     {
         return {
-            character           : await this.streamReader.readRaw(2),
+            character           : this.streamReader.readRaw(2),
             foregroundColor     : {
-                r : await this.streamReader.readFloat(),
-                g : await this.streamReader.readFloat(),
-                b : await this.streamReader.readFloat(),
-                a : await this.streamReader.readFloat()
+                r : this.streamReader.readFloat(),
+                g : this.streamReader.readFloat(),
+                b : this.streamReader.readFloat(),
+                a : this.streamReader.readFloat()
             },
             backgroundColor     : {
-                r : await this.streamReader.readFloat(),
-                g : await this.streamReader.readFloat(),
-                b : await this.streamReader.readFloat(),
-                a : await this.streamReader.readFloat()
+                r : this.streamReader.readFloat(),
+                g : this.streamReader.readFloat(),
+                b : this.streamReader.readFloat(),
+                a : this.streamReader.readFloat()
             }
         };
     }
 
     // https://github.com/CoderDE/FicsIt-Networks/blob/ab918a81a8a7527aec0cf6cd35270edfc5a1ddfe/Source/FicsItNetworks/Network/FINNetworkTrace.cpp#L154
-    async readFINNetworkTrace()
+    readFINNetworkTrace()
     {
         let data            = {};
-            data.levelName  = await this.streamReader.readString();
-            data.pathName   = await this.streamReader.readString();
+            data.levelName  = this.streamReader.readString();
+            data.pathName   = this.streamReader.readString();
 
-            let hasPrev = await this.streamReader.readInt();
+            let hasPrev = this.streamReader.readInt();
                 if(hasPrev === 1)
                 {
-                    data.prev  = await this.readFINNetworkTrace();
+                    data.prev  = this.readFINNetworkTrace();
                 }
-            let hasStep = await this.streamReader.readInt();
+            let hasStep = this.streamReader.readInt();
                 if(hasStep === 1)
                 {
-                    data.step  = await this.streamReader.readString();
+                    data.step  = this.streamReader.readString();
                 }
 
         return data;
     }
 
     // https://github.com/CoderDE/FicsIt-Networks/blob/master/Source/FicsItNetworks/FicsItKernel/Processor/Lua/LuaProcessorStateStorage.cpp#L6
-    async readFINLuaProcessorStateStorage()
+    readFINLuaProcessorStateStorage()
     {
         let data            = {trace: [], reference: [], structs: []};
-        let countTrace      = await this.streamReader.readInt();
+        let countTrace      = this.streamReader.readInt();
             for(let i = 0; i < countTrace; i++)
             {
-                data.trace.push(await this.readFINNetworkTrace());
+                data.trace.push(this.readFINNetworkTrace());
             }
 
-        let countReference  = await this.streamReader.readInt();
+        let countReference  = this.streamReader.readInt();
             for(let i = 0; i < countReference; i++)
             {
                 data.reference.push({
-                    levelName: await this.streamReader.readString(),
-                    pathName: await this.streamReader.readString()
+                    levelName: this.streamReader.readString(),
+                    pathName: this.streamReader.readString()
                 });
             }
 
-        data.thread         = await this.streamReader.readString();
-        data.globals        = await this.streamReader.readString();
+        data.thread         = this.streamReader.readString();
+        data.globals        = this.streamReader.readString();
 
-        let countStructs    = await this.streamReader.readInt();
+        let countStructs    = this.streamReader.readInt();
             data.structs    = [];
 
             for(let i = 0; i < countStructs; i++)
             {
                 let structure = {};
-                    structure.unk1  = await this.streamReader.readInt();
-                    structure.unk2  = await this.streamReader.readString();
+                    structure.unk1  = this.streamReader.readInt();
+                    structure.unk2  = this.streamReader.readString();
 
                     switch(structure.unk2)
                     {
                         case '/Script/CoreUObject.Vector':
-                            structure.x         = await this.streamReader.readFloat();
-                            structure.y         = await this.streamReader.readFloat();
-                            structure.z         = await this.streamReader.readFloat();
+                            structure.x         = this.streamReader.readFloat();
+                            structure.y         = this.streamReader.readFloat();
+                            structure.z         = this.streamReader.readFloat();
                             break;
                         case '/Script/CoreUObject.LinearColor':
-                            structure.r         = await this.streamReader.readFloat();
-                            structure.g         = await this.streamReader.readFloat();
-                            structure.b         = await this.streamReader.readFloat();
-                            structure.a         = await this.streamReader.readFloat();
+                            structure.r         = this.streamReader.readFloat();
+                            structure.g         = this.streamReader.readFloat();
+                            structure.b         = this.streamReader.readFloat();
+                            structure.a         = this.streamReader.readFloat();
                             break;
                         case '/Script/FactoryGame.InventoryStack':
-                            structure.unk3      = await this.streamReader.readInt();
-                            structure.unk4      = await this.streamReader.readString();
-                            structure.unk5      = await this.streamReader.readInt();
-                            structure.unk6      = await this.streamReader.readInt();
-                            structure.unk7      = await this.streamReader.readInt();
+                            structure.unk3      = this.streamReader.readInt();
+                            structure.unk4      = this.streamReader.readString();
+                            structure.unk5      = this.streamReader.readInt();
+                            structure.unk6      = this.streamReader.readInt();
+                            structure.unk7      = this.streamReader.readInt();
                             break;
                         case '/Script/FactoryGame.ItemAmount':
-                            structure.unk3      = await this.streamReader.readInt();
-                            structure.unk4      = await this.streamReader.readString();
-                            structure.unk5      = await this.streamReader.readInt();
+                            structure.unk3      = this.streamReader.readInt();
+                            structure.unk4      = this.streamReader.readString();
+                            structure.unk5      = this.streamReader.readInt();
                             break;
                         case '/Script/FicsItNetworks.FINTrackGraph':
-                            structure.trace     = await this.readFINNetworkTrace();
-                            structure.trackId   = await this.streamReader.readInt();
+                            structure.trace     = this.readFINNetworkTrace();
+                            structure.trackId   = this.streamReader.readInt();
                             break;
                         case '/Script/FicsItNetworks.FINInternetCardHttpRequestFuture': // Skip!
                         case '/Script/FactoryGame.InventoryItem': // Skip!
                             break;
                         case '/Script/FicsItNetworks.FINGPUT1Buffer':
-                            structure.x         = await this.streamReader.readInt();
-                            structure.y         = await this.streamReader.readInt();
-                            structure.size      = await this.streamReader.readInt();
-                            structure.name      = await this.streamReader.readString();
-                            structure.type      = await this.streamReader.readString();
-                            structure.length    = await this.streamReader.readInt();
+                            structure.x         = this.streamReader.readInt();
+                            structure.y         = this.streamReader.readInt();
+                            structure.size      = this.streamReader.readInt();
+                            structure.name      = this.streamReader.readString();
+                            structure.type      = this.streamReader.readString();
+                            structure.length    = this.streamReader.readInt();
                             structure.buffer    = [];
                                 for(let size = 0; size < structure.size; size++)
                                 {
-                                    structure.buffer.push(await this.readFINGPUT1BufferPixel());
+                                    structure.buffer.push(this.readFINGPUT1BufferPixel());
                                 }
-                            structure.unk3      = await this.streamReader.readRaw(45); //TODO: Not sure at all!
+                            structure.unk3      = this.streamReader.readRaw(45); //TODO: Not sure at all!
                             break;
                         default:
                             this.worker.postMessage({command: 'alertParsing'});

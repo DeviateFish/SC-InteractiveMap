@@ -33,7 +33,7 @@ export default class HeaderReader {
     constructor(arrayBuffer) {
         this._buf = arrayBuffer;
         // 1024 is probably more than we need...
-        this._view = new DataView(this._buf, 0, 1024);
+        this._view = new DataView(this._buf, 0, 102400);
         this._offset = 0;
         this.headerVersion = null;
     }
