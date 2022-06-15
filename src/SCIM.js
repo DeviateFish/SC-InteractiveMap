@@ -107,7 +107,6 @@ export default class SCIM
                             droppedFileResult       : reader.result,
                             droppedFileName         : droppedFile.name
                         });
-                        delete reader.result;
                     };
             }
             else

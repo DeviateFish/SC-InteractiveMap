@@ -4,7 +4,8 @@
  */
 
 /**
- * Read a utf8 string from a given dataview
+ * Read a utf8 string from a given dataview.  This expects a 0-terminated string,
+ * and drops the null terminator
  * @param {DataView} view The view to read from
  * @param {Number} offset The offset to start reading from
  * @param {Number} length How many bytes to read
@@ -12,14 +13,15 @@
  */
 export const readUTF8String = (view, offset, length) => {
     const str = [];
-    for (let i = 0; i < length; i++) {
+    for (let i = 0; i < length - 1; i++) {
         str.push(String.fromCharCode(view.getUint8(offset + i)));
     }
     return str.join('');
 };
 
 /**
- * Read a utf16 string from a given dataview
+ * Read a utf16 string from a given dataview.This expects a 0-terminated string,
+ * and drops the null terminator
  * I'm not sure this is correct, since we're trying to read a series of uint16 one byte at a time...
  * @param {DataView} view
  * @param {Number} offset
@@ -28,7 +30,7 @@ export const readUTF8String = (view, offset, length) => {
  */
 export const readUTF16String = (view, offset, length) => {
     const str = [];
-    for (let i = 0; i < length; i++) {
+    for (let i = 0; i < length - 1; i++) {
         str.push(String.fromCharCode(view.getUint16(offset + i, true)));
     }
     return str.join('');

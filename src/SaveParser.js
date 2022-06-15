@@ -39,7 +39,7 @@ export default class SaveParser
         this.worker.postMessage({
             arrayBuffer     : this.arrayBuffer,
             language        : this.language
-        });
+        }, [this.arrayBuffer]);
 
         $('#loaderProgressBar').css('display', 'flex');
         this.onWorkerMessage({command: 'loaderProgress', percentage: 0});
