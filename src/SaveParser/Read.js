@@ -1,6 +1,6 @@
 /* global Sentry, Intl, self */
+import HeaderReader                             from './HeaderReader';
 import pako                                     from '../Lib/pako.esm.js';
-
 import Building_Conveyor                        from '../Building/Conveyor.js';
 
 export default class SaveParser_Read
@@ -22,30 +22,13 @@ export default class SaveParser_Read
 
     parseSave()
     {
-        this.header                      = {};
-        this.header.saveHeaderType       = this.readInt();
+        const headerReader = new HeaderReader(this.arrayBuffer);
+        const saveHeaderType = headerReader.readHeaderVersion();
 
-        if(this.header.saveHeaderType <= 99)
+        if(saveHeaderType <= 99)
         {
-            this.header.saveVersion          = this.readInt();
-            this.header.buildVersion         = this.readInt();
-            this.header.mapName              = this.readString();
-            this.header.mapOptions           = this.readString();
-            this.header.sessionName          = this.readString();
-            this.header.playDurationSeconds  = this.readInt();
-            this.header.saveDateTime         = this.readLong();
-            this.header.sessionVisibility    = this.readByte();
-
-            if(this.header.saveHeaderType >= 7)
-            {
-                this.header.fEditorObjectVersion = this.readInt();
-            }
-            if(this.header.saveHeaderType >= 8)
-            {
-                this.header.modMetadata      = this.readString();
-                this.header.isModdedSave     = this.readInt();
-            }
-
+            this.header = headerReader.read();
+            this.currentByte = this.header.headerSize;
             console.log(this.header);
 
             this.worker.postMessage({command: 'transferData', data: {header: this.header}});
@@ -124,10 +107,9 @@ export default class SaveParser_Read
                 {
                     Sentry.setContext('pako', pako);
                 }
-                throw new Error(err);
 
                 this.worker.postMessage({command: 'loaderHide'});
-                return;
+                throw err;
             }
 
             let currentPercentage = Math.round(this.handledByte / this.maxByte * 100);
