@@ -43,6 +43,10 @@ export default class HeaderReader extends StreamReader {
      */
     readHeaderVersion() {
         if (!this.headerVersion) {
+            if (this._offset !== 0) {
+                throw new Error('HeaderReader.read must be the first thing called!');
+            }
+
             this.headerVersion = this.readInt();
         }
         return this.headerVersion;
@@ -54,9 +58,6 @@ export default class HeaderReader extends StreamReader {
      */
     readHeader() {
         if (!this.header) {
-            if (this._offset !== 0) {
-                throw new Error('HeaderReader.read must be the first thing called!');
-            }
             const header = {};
 
             header.saveHeaderType = this.readHeaderVersion();
