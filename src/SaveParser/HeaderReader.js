@@ -1,12 +1,4 @@
-import {
-    readUTF8String,
-    readUTF16String,
-    readUint8,
-    readInt8,
-    readInt32,
-    readFloat32,
-    readFloat64,
-} from './Readers';
+import StreamReader from './StreamReader';
 
 /**
  * @typedef {Object} SaveHeader
@@ -29,14 +21,19 @@ import {
  * This class reads and parses the header portion of a save file.  Assumes it will be given a reference to the whole save file.
  * After reading the header, the save file version can then be used to figure out what to do with the rest of the contents
  */
-export default class HeaderReader {
+export default class HeaderReader extends StreamReader {
     constructor(arrayBuffer) {
-        this._buf = arrayBuffer;
-        // We don't care about the length here since this doesn't really allocate any more
-        // memory.  We're also always starting from offset 0, so that doesn't matter, either.
-        this._view = new DataView(this._buf);
-        this._offset = 0;
+        super(arrayBuffer);
+
+        /**
+         * @type Number
+         */
         this.headerVersion = null;
+
+        /**
+         * @type SaveHeader
+         */
+        this.header = null;
     }
 
     /**
@@ -55,74 +52,37 @@ export default class HeaderReader {
      * Read the header of the save file.  Returns a SaveHeader object
      * @returns SaveHeader
      */
-    read() {
-        const header = {};
+    readHeader() {
+        if (!this.header) {
+            if (this._offset !== 0) {
+                throw new Error('HeaderReader.read must be the first thing called!');
+            }
+            const header = {};
 
-        header.saveHeaderType = this.readHeaderVersion();
-        header.saveVersion = this.readInt();
-        header.buildVersion = this.readInt();
-        header.mapName = this.readString();
-        header.mapOptions = this.readString();
-        header.sessionName = this.readString();
-        header.playDurationSeconds = this.readInt();
-        header.saveDateTime = this.readLong();
-        header.sessionVisibility = this.readByte();
+            header.saveHeaderType = this.readHeaderVersion();
+            header.saveVersion = this.readInt();
+            header.buildVersion = this.readInt();
+            header.mapName = this.readString();
+            header.mapOptions = this.readString();
+            header.sessionName = this.readString();
+            header.playDurationSeconds = this.readInt();
+            header.saveDateTime = this.readLong();
+            header.sessionVisibility = this.readByte();
 
-        if(header.saveHeaderType >= 7)
-        {
-            header.fEditorObjectVersion = this.readInt();
-        }
-        if(header.saveHeaderType >= 8)
-        {
-            header.modMetadata      = this.readString();
-            header.isModdedSave     = this.readInt();
-        }
-        header.headerSize = this._offset;
+            if(header.saveHeaderType >= 7)
+            {
+                header.fEditorObjectVersion = this.readInt();
+            }
+            if(header.saveHeaderType >= 8)
+            {
+                header.modMetadata      = this.readString();
+                header.isModdedSave     = this.readInt();
+            }
+            header.headerSize = this._offset;
 
-        return header;
-    }
-
-    readInt() {
-        const val = readInt32(this._view, this._offset);
-        this._offset += 4;
-        return val;
-    }
-
-    readByte() {
-        const val = readUint8(this._view, this._offset);
-        this._offset += 1;
-        return val;
-    }
-
-    readLong() {
-        const low = this.readInt();
-        const high = this.readInt();
-
-        if (high === 0) {
-            return low;
-        } else {
-            return [low, high];
-        }
-    }
-
-    readString() {
-        const length = this.readInt();
-
-        if (length === 0) {
-            return '';
+            this.header = header;
         }
 
-        if (length < 0) {
-            // UTF-16
-            const realLen = -length;
-            const val = readUTF16String(this._view, this._offset, realLen);
-            this._offset += realLen;
-            return val;
-        } else {
-            // UTF-8
-            const val = readUTF8String(this._view, this._offset, length);
-            this._offset += length;
-            return val;
-        }
+        return this.header;
     }
 }

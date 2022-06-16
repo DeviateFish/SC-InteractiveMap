@@ -1,7 +1,7 @@
 /* global Sentry, Intl, self */
 import HeaderReader                             from './HeaderReader';
 import pako                                     from '../Lib/pako.esm.js';
-import StreamReader                             from './StreamReader';
+import ChunkedReader                            from './ChunkedReader';
 import Building_Conveyor                        from '../Building/Conveyor.js';
 
 export default class SaveParser_Read
@@ -14,8 +14,6 @@ export default class SaveParser_Read
         this.language           = options.language;
 
         this.arrayBuffer        = options.arrayBuffer;
-        // Still used for header try not to shrink it too much as modMetadata can be longer than anticipated...
-        this.bufferView         = new DataView(this.arrayBuffer, 0, 102400);
         this.currentByte        = 0;
         this.maxByte            = this.arrayBuffer.byteLength;
         this.streamReader       = null;
@@ -30,14 +28,14 @@ export default class SaveParser_Read
 
         if(saveHeaderType <= 99)
         {
-            this.header = headerReader.read();
+            this.header = headerReader.readHeader();
             // keep track of this offset for chunk decompression purposes.
             this.currentByte = this.header.headerSize;
             console.log(this.header);
 
             this.worker.postMessage({command: 'transferData', data: {header: this.header}});
 
-            this.streamReader = new StreamReader(() => this.inflateNextChunk());
+            this.streamReader = new ChunkedReader(() => this.inflateNextChunk());
 
             // We should now unzip the body!
             if(this.header.saveVersion >= 21)
@@ -312,7 +310,6 @@ export default class SaveParser_Read
 
         this.worker.postMessage({command: 'transferData', data: {collectables: collectables}});
 
-        delete this.bufferView;
         this.worker.postMessage({command: 'endSaveLoading'});
     }
 
