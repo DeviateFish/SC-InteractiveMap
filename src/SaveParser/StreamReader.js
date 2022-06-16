@@ -128,8 +128,6 @@ export default class StreamReader {
      * a 32-bit signed number indicating length, followed by that many bytes representing
      * a 0-terminated string.  If the length is negative, this indicates the characters are
      * encoded as UTF-16.  If the length is positive, it's UTF-8.
-     *
-     * The UTF-16 decoding seems a bit dodgy, though.
      * @returns String
      */
     readString() {
@@ -141,8 +139,8 @@ export default class StreamReader {
 
         if (length < 0) {
             // UTF-16
-            const realLen = -length;
-            return this._read(realLen, (buf, offset) => readUTF16String(buf, offset, realLen));
+            const realLen = (-length) * 2;
+            return this._read(realLen, (buf, offset) => readUTF16String(buf, offset, -length));
         } else {
             // UTF-8
             return this._read(length, (buf, offset) => readUTF8String(buf, offset, length));

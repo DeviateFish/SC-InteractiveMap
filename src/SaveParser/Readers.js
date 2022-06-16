@@ -31,7 +31,7 @@ export const readUTF8String = (view, offset, length) => {
 export const readUTF16String = (view, offset, length) => {
     const str = [];
     for (let i = 0; i < length - 1; i++) {
-        str.push(String.fromCharCode(view.getUint16(offset + i, true)));
+        str.push(String.fromCharCode(view.getUint16(offset + (i * 2), true)));
     }
     return str.join('');
 };
